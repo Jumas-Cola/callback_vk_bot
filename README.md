@@ -1,4 +1,4 @@
-callback_vk_bot ![Python 3.6](https://pp.userapi.com/c846523/v846523407/b716d/N3RXKWFcPS0.jpg)
+callback_vk_bot
 ======
 **callback_vk_bot** – простой callback-бот для группы на PHP для социальной сети Вконтакте (vk.com)
 
