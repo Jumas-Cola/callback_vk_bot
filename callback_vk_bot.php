@@ -28,7 +28,10 @@ $login = 'login';
 $password = 'password';
 
 //...список групп, откуда берём картинки
-$groups = array(-168416289, -168416289, -168416289);
+$groups = array(-166989747, -162289145, -168649092);
+
+//...список групп, откуда берём gif-ки
+$groups_gif = array(-39615703, -152567386, -96920344);
 
 //...слова для фильтрации (чтобы не отправить рекламную картинку/конкурс и тд)
 $stop_words = array('конкурс','розыгрыш','приз','итоги','результаты');
@@ -74,7 +77,7 @@ switch ($data->type) {
         //..проверяем, есть ли в тексте сообщения запрос на отправку картинки
         if ((strpos($body, 'лоли') !== false) or (strpos($body, 'loli') !== false) or (strpos($body, 'тян') !== false) or (strpos($body, 'лолю') !== false) or (strpos($body, 'лоля') !== false)) {
             try {
-            	//...если есть файл с токеном пользователя - читает его из файла, если нет - получает токен и пишет в файл
+            	//...если есть файл с токеном пользователя - читаем его из файла, если нет - получаем токен и пишем в файл
                 $accessToken = getToken($client_id, $client_secret, $login, $password);
 
                 //...выбираем случайную группу из списка
@@ -121,11 +124,82 @@ switch ($data->type) {
 
                 //С помощью messages.send и токена сообщества отправляем ответное сообщение с картинкой
                 $request_params = array(
-                'user_id' => $userId,
-                'attachment' => $loli,
-                'access_token' => $token,
-                'read_state' => 1,
-                'v' => '5.0'
+                	'message' => 'Посмотри, что я нашла для тебя:',
+	                'user_id' => $userId,
+	                'attachment' => $loli,
+	                'access_token' => $token,
+	                'read_state' => 1,
+	                'v' => '5.0'
+                );
+
+                $get_params = http_build_query($request_params);
+
+                file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+
+                //Возвращаем "ok" серверу Callback API
+                echo('ok');
+
+                break;
+
+            } catch (Exception $e) {}
+        //.. проверяем, есть ли в тексте сообщения запрос на отправку гифки
+        } elseif ((strpos($body, 'гиф') !== false) or (strpos($body, 'gif') !== false)) {
+        	try {
+            	//...если есть файл с токеном пользователя - читаем его из файла, если нет - получаем токен и пишем в файл
+                $accessToken = getToken($client_id, $client_secret, $login, $password);
+
+                //...выбираем случайную группу из списка
+                $rand_elem = array_rand($groups_gif);
+                $group_id = $groups_gif[$rand_elem];
+
+                //...получаем 100 первых записей со стены этой группы
+                $request_params = array(
+                        'owner_id' => $group_id,
+                        'count' => 100,
+                    	'filter' => 'owner',
+                        'v' => '5.52',
+                        'access_token' => $accessToken
+                    );
+
+                $get_params = http_build_query($request_params);
+                $posts = json_decode(file_get_contents('https://api.vk.com/method/wall.get?'. $get_params));
+                $posts_array = $posts->response->items;
+
+                $loli = '';
+
+                //...пока не получим объект гиф - выбираем случайный пост из ста и проверяем: есть ли прикреплённые изображения/нет ли стоп-слов в тексте поста/не является ли пост рекламным
+                while (!$loli) {
+                  $got_stop_words = FALSE;
+                  $i = rand(2, 99);
+                  $post = $posts_array[$i];
+                  foreach ($stop_words as $word) {
+                    if (strpos(mb_strtolower($post->text), $word) !== false) {
+                      $got_stop_words = TRUE;
+                      break;
+                    }
+                  }
+                  if (($post->attachments) && !$got_stop_words && ($post->marked_as_ads == 0)) {
+                    $attachments = $post->attachments;
+                    foreach ($attachments as $attachment) {
+                      if ($attachment->type == 'doc') {
+                        $doc = $attachment->doc;
+                        if ($doc->ext == 'gif'){
+                        	$loli = sprintf( 'doc%d_%d', $doc->owner_id, $doc->id);
+                        	break;
+                        }
+                      }
+                    }
+                  }
+                }
+
+                //С помощью messages.send и токена сообщества отправляем ответное сообщение с гифкой
+                $request_params = array(
+                	'message' => 'Посмотри, что я нашла для тебя:',
+	                'user_id' => $userId,
+	                'attachment' => $loli,
+	                'access_token' => $token,
+	                'read_state' => 1,
+	                'v' => '5.0'
                 );
 
                 $get_params = http_build_query($request_params);
