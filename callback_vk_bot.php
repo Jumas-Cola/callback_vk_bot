@@ -251,7 +251,7 @@ switch ($data->type) {
                       break;
                     }
                   }
-                  if (!$got_stop_words && ($post->marked_as_ads == 0)) {
+                  if (($post->attachments) && !$got_stop_words && ($post->marked_as_ads == 0)) {
                     $text = '';
                     $attachments = $post->attachments;
                     foreach ($attachments as $attachment) {
