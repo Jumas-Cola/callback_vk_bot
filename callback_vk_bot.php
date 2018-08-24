@@ -238,52 +238,55 @@ switch ($data->type) {
                 $posts = json_decode(file_get_contents('https://api.vk.com/method/wall.get?'. $get_params));
                 $posts_array = $posts->response->items;
 
-                $loli = '';
-
-                //...пока не получим аниме - выбираем случайный пост из ста и проверяем:нет ли стоп-слов в тексте поста/не является ли пост рекламным
-                while (!$loli) {
-                  $got_stop_words = FALSE;
-                  $i = rand(2, 99);
-                  $post = $posts_array[$i];
-                  foreach ($stop_words as $word) {
-                    if (strpos(mb_strtolower($post->text), $word) !== false) {
-                      $got_stop_words = TRUE;
-                      break;
+                $resp = '';
+                while (!$resp) {
+                    $loli = '';
+                    //...пока не получим аниме - выбираем случайный пост из ста и проверяем:нет ли стоп-слов в тексте поста/не является ли пост рекламным
+                    while (!$loli) {
+                      $got_stop_words = FALSE;
+                      $i = rand(2, 99);
+                      $post = $posts_array[$i];
+                      foreach ($stop_words as $word) {
+                        if (strpos(mb_strtolower($post->text), $word) !== false) {
+                          $got_stop_words = TRUE;
+                          break;
+                        }
+                      }
+                      if (($post->attachments) && !$got_stop_words && ($post->marked_as_ads == 0)) {
+                        $text = '';
+                        $attachments = $post->attachments;
+                        foreach ($attachments as $attachment) {
+                          if ($attachment->type == 'doc') {
+                                $doc = $attachment->doc;
+                                $loli .= sprintf( 'doc%d_%d,', $doc->owner_id, $doc->id);
+                            }
+                          if ($attachment->type == 'photo') {
+                                $photo = $attachment->photo;
+                                $text .= $photo->text;
+                                $loli .= sprintf( 'photo%d_%d,', $photo->owner_id, $photo->id);
+                            }
+                          if ($attachment->type == 'video') {
+                                $video = $attachment->video;
+                                $loli .= sprintf( 'video%d_%d,', $video->owner_id, $video->id);
+                            }
+                      }
                     }
                   }
-                  if (($post->attachments) && !$got_stop_words && ($post->marked_as_ads == 0)) {
-                    $text = '';
-                    $attachments = $post->attachments;
-                    foreach ($attachments as $attachment) {
-                      if ($attachment->type == 'doc') {
-	                        $doc = $attachment->doc;
-	                        $loli .= sprintf( 'doc%d_%d,', $doc->owner_id, $doc->id);
-                        }
-                      if ($attachment->type == 'photo') {
-	                        $photo = $attachment->photo;
-	                        $text .= $photo->text;
-	                        $loli .= sprintf( 'photo%d_%d,', $photo->owner_id, $photo->id);
-                        }
-                      if ($attachment->type == 'video') {
-	                        $video = $attachment->video;
-	                        $loli .= sprintf( 'video%d_%d,', $video->owner_id, $video->id);
-                        }
-                  }
-                }
-              }
-                //С помощью messages.send и токена сообщества отправляем ответное сообщение с гифкой
+
+                  //С помощью messages.send и токена сообщества отправляем ответное сообщение с гифкой
                 $request_params = array(
-                	'message' => $text,
-	                'user_id' => $userId,
-	                'attachment' => $loli,
-	                'access_token' => $token,
-	                'read_state' => 1,
-	                'v' => '5.0'
+                    'message' => $text,
+                    'user_id' => $userId,
+                    'attachment' => $loli,
+                    'access_token' => $token,
+                    'read_state' => 1,
+                    'v' => '5.0'
                 );
 
                 $get_params = http_build_query($request_params);
 
-                file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+                try{$resp = file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);} catch (Exception $e) {}
+                }
 
                 //Возвращаем "ok" серверу Callback API
                 echo('ok');
