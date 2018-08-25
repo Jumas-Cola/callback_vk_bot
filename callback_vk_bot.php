@@ -1,5 +1,11 @@
 <?php
-include "vk_api.php"; //Подключаем библиотеку для работы с api vk
+//const clientID = "2274003"                      //VK for Android app client_id
+//const clientSecret = "hHbZxrka2uZ6jB1inYsH"     //VK for Android app client_secret
+//const clientID = "3697615"                      //VK for Windows app client_id
+//const clientSecret = "AlVXZFMUqyrnABp8ncuU"     //VK for Windows app client_secret
+//const clientID = "3140623"                        //VK for iPhone app client_id
+//const clientSecret = "VeWdmVclDCtn6ihuP1nt"       //VK for iPhone app client_secret
+
 
 function getToken($client_id, $client_secret, $login, $password) {
 	$file = 'access_token.txt';
@@ -13,97 +19,106 @@ function getToken($client_id, $client_secret, $login, $password) {
 	return $accessToken;
 }
 
-//**********CONFIG**************
-const CLIENT_ID = 3140623;
-const CLIENT_SECRET = 'VeWdmVclDCtn6ihuP1nt';
-const LOGIN = 'login';
-const PASSWORD = 'password';
-const GROUP_TOKEN = 'group_token'; //тот самый длинный ключ доступа сообщества
-const CONFIRMATION_TOKEN = 'confirmation_token'; //например c40b9566, введите свой
-const SECRET_KEY = 'secret_key';
-const API_VERSION = '5.80'; //ваша версия используемого api
-const ADMIN_ID = 123456; //тот, кому будет прислано оповещение при необходимости связаться с админом
-define('ACCESS_TOKEN', getToken(CLIENT_ID, CLIENT_SECRET, LOGIN, PASSWORD));
+$client_id = 3140623;
 
-define('PICTURE_GROUPS', array(-166989747, -162289145, -168649092)); //список групп, откуда берём картинки
-define('GIF_GROUPS', array(-39615703, -152567386)); //список групп, откуда берём gif-ки
-define('ANIME_GROUPS', array(-98592298)); //список групп, откуда берём новинки аниме
-define('STOP_WORDS', array('конкурс','розыгрыш','приз','итоги','результаты')); //слова для фильтрации (чтобы не отправить рекламную картинку/конкурс и тд)
-//******************************
+$client_secret = 'VeWdmVclDCtn6ihuP1nt';
 
-const BTN_IMG =  [["action" => 'send_img'], "лоли", "blue"]; 
-const BTN_GIF =  [["action" => 'send_gif'], "гиф", "blue"]; 
-const BTN_ANIME = [["action" => 'send_gif'], "аниме", "blue"]; 
-const BTN_ADMIN = [["action" => 'letter_to_admin'], "Связаться с админом", "white"]; 
+$login = 'login';
+
+$password = 'password';
+
+//...список групп, откуда берём картинки
+$groups = array(-166989747, -162289145, -168649092);
+
+//...список групп, откуда берём gif-ки
+$groups_gif = array(-39615703, -152567386);
+
+//...список групп, откуда берём новинки аниме
+$groups_anime = array(-98592298);
+
+//...слова для фильтрации (чтобы не отправить рекламную картинку/конкурс и тд)
+$stop_words = array('конкурс','розыгрыш','приз','итоги','результаты');
 
 if (!isset($_REQUEST)) {
     return;
 }
 
-$data = json_decode(file_get_contents('php://input')); //Получает и декодирует JSON пришедший из ВК
+//Строка для подтверждения адреса сервера из настроек Callback API
+$confirmationToken = 'confirmationToken';
 
-if(strcmp($data->secret, SECRET_KEY) !== 0 && strcmp($data->type, 'confirmation') !== 0) // проверяем secretKey
+//Ключ доступа сообщества
+$token = 'token';
+
+// Secret key
+$secretKey = 'secretKey';
+
+//Получаем и декодируем уведомление
+$data = json_decode(file_get_contents('php://input'));
+
+// проверяем secretKey
+if(strcmp($data->secret, $secretKey) !== 0 && strcmp($data->type, 'confirmation') !== 0)
     return;
-    
-$vk = new vk_api(GROUP_TOKEN, API_VERSION); // создание экземпляра класса работы с api, принимает ключ и версию api
 
 //Проверяем, что находится в поле "type"
 switch ($data->type) {
-    
-    case 'confirmation': //Если это уведомление для подтверждения адреса сервера
-        exit(CONFIRMATION_TOKEN); //Завершаем скрипт отправкой ключа
+    //Если это уведомление для подтверждения адреса сервера...
+    case 'confirmation':
+        //...отправляем строку для подтверждения адреса
+        echo $confirmationToken;
+        break;
 
-    case 'message_new': //Если это уведомление о новом сообщении
-    	$peer_id = $data->object->from_id; //Получаем id пользователя, который написал сообщение
-		$message = $data->object->text;
-		$message = mb_strtolower($message);
-		if (isset($data->object->payload)){  //получаем payload
-	        	$payload = json_decode($data->object->payload, True);
-	   	} else {
-	      		$payload = null;
-	   	}
-	   	if ($message == 'начать' or $message == 'start') { //Если нажата кнопка начать 
-  			$resp = $vk->sendButton($peer_id, 'Привет, рада тебя видеть 💖<br>'.
-											'В нашей группе работает лоли-бот 😊<br>'.
-											'лоли/loli - случайная картинка лолечки ❤<br>'.
-											'гиф/gif - случайная аниме-гифка 🌈<br>'.
-											'аниме/anime - и она посоветует аниме ✨', 
-											[ //Отправляем кнопки пользователю
-						  						[BTN_IMG, BTN_GIF, BTN_ANIME],
-						  						[BTN_ADMIN]
-						  					]);
+    //Если это уведомление о новом сообщении...
+    case 'message_new':
+        //...получаем id его автора
+        $userId = $data->object->user_id;
 
-  			$vk->sendOK(); //Говорим vk, что мы приняли callback
-            break;
+        //...получаем тело сообщения и приводим его к нижнему регистру
+        $body_var = $data->object->body;
+        $body = mb_strtolower($body_var);
+        
+
         //..проверяем, есть ли в тексте сообщения запрос на отправку картинки
-        } elseif ((strpos($message, 'лоли') !== false) or (strpos($message, 'loli') !== false) or (strpos($message, 'тян') !== false) or (strpos($message, 'лолю') !== false) or (strpos($message, 'лоля') !== false)) {
+        if ((strpos($body, 'лоли') !== false) or (strpos($body, 'loli') !== false) or (strpos($body, 'тян') !== false) or (strpos($body, 'лолю') !== false) or (strpos($body, 'лоля') !== false)) {
+            try {
+            	//...если есть файл с токеном пользователя - читаем его из файла, если нет - получаем токен и пишем в файл
+                $accessToken = getToken($client_id, $client_secret, $login, $password);
+
                 //...выбираем случайную группу из списка
-                $rand_elem = array_rand(PICTURE_GROUPS);
-                $group_id = PICTURE_GROUPS[$rand_elem];
-                $user = new vk_api(ACCESS_TOKEN, API_VERSION); // создание экземпляра класса работы с api, принимает ключ и версию api
-                $posts = $user->request('wall.get', ['owner_id' => $group_id,
-							                        'count' => 100,
-							                    	'filter' => 'owner',
-							                        'access_token' => ACCESS_TOKEN,
-							                    	'v' => API_VERSION]);
-                $posts_array = $posts['items'];
+                $rand_elem = array_rand($groups);
+                $group_id = $groups[$rand_elem];
+
+                //...получаем 100 первых записей со стены этой группы
+                $request_params = array(
+                        'owner_id' => $group_id,
+                        'count' => 100,
+                    	'filter' => 'owner',
+                        'v' => '5.52',
+                        'access_token' => $accessToken
+                    );
+
+                $get_params = http_build_query($request_params);
+                $posts = json_decode(file_get_contents('https://api.vk.com/method/wall.get?'. $get_params));
+                $posts_array = $posts->response->items;
+
+                $loli = '';
+
                 //...пока не получим объект фото - выбираем случайный пост из ста и проверяем: есть ли прикреплённые изображения/нет ли стоп-слов в тексте поста/не является ли пост рекламным
-                while (!isset($loli)) {
+                while (!$loli) {
                   $got_stop_words = FALSE;
                   $i = rand(2, 99);
                   $post = $posts_array[$i];
-                  foreach (STOP_WORDS as $word) {
-                    if (strpos(mb_strtolower($post['text']), $word) !== false) {
+                  foreach ($stop_words as $word) {
+                    if (strpos(mb_strtolower($post->text), $word) !== false) {
                       $got_stop_words = TRUE;
                       break;
                     }
                   }
-                  if (isset($post['attachments']) && !$got_stop_words && ($post['marked_as_ads'] == 0)) {
-                    $attachments = $post['attachments'];
+                  if (($post->attachments) && !$got_stop_words && ($post->marked_as_ads == 0)) {
+                    $attachments = $post->attachments;
                     foreach ($attachments as $attachment) {
-                      if ($attachment['type'] == 'photo') {
-                        $photo = $attachment['photo'];
-                        $loli = sprintf( 'photo%d_%d', $photo['owner_id'], $photo['id']);
+                      if ($attachment->type == 'photo') {
+                        $photo = $attachment->photo;
+                        $loli = sprintf( 'photo%d_%d', $photo->owner_id, $photo->id);
                         break;
                       }
                     }
@@ -111,44 +126,68 @@ switch ($data->type) {
                 }
 
                 //С помощью messages.send и токена сообщества отправляем ответное сообщение с картинкой
-                $resp = $vk->request('messages.send', ['message' => 'Посмотри, что я нашла для тебя:',
-									                'peer_id' => $peer_id,
-									                'attachment' => $loli,
-									                'access_token' => GROUP_TOKEN,
-							                     	'v' => API_VERSION]);
+                $request_params = array(
+                	'message' => 'Посмотри, что я нашла для тебя:',
+	                'user_id' => $userId,
+	                'attachment' => $loli,
+	                'access_token' => $token,
+	                'read_state' => 1,
+	                'v' => '5.0'
+                );
 
-                $vk->sendOK(); //Говорим vk, что мы приняли callback
+                $get_params = http_build_query($request_params);
+
+                file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+
+                //Возвращаем "ok" серверу Callback API
+                echo('ok');
+
                 break;
+
+            } catch (Exception $e) {}
         //.. проверяем, есть ли в тексте сообщения запрос на отправку гифки
-        } elseif ((strpos($message, 'гиф') !== false) or (strpos($message, 'gif') !== false)) {
-        		//...выбираем случайную группу из списка
-                $rand_elem = array_rand(GIF_GROUPS);
-                $group_id = GIF_GROUPS[$rand_elem];
-                $user = new vk_api(ACCESS_TOKEN, API_VERSION); // создание экземпляра класса работы с api, принимает ключ и версию api
-                $posts = $user->request('wall.get', ['owner_id' => $group_id,
-							                        'count' => 100,
-							                    	'filter' => 'owner',
-							                        'access_token' => ACCESS_TOKEN,
-							                    	'v' => API_VERSION]);
-                $posts_array = $posts['items'];
+        } elseif ((strpos($body, 'гиф') !== false) or (strpos($body, 'gif') !== false)) {
+        	try {
+            	//...если есть файл с токеном пользователя - читаем его из файла, если нет - получаем токен и пишем в файл
+                $accessToken = getToken($client_id, $client_secret, $login, $password);
+
+                //...выбираем случайную группу из списка
+                $rand_elem = array_rand($groups_gif);
+                $group_id = $groups_gif[$rand_elem];
+
+                //...получаем 100 первых записей со стены этой группы
+                $request_params = array(
+                        'owner_id' => $group_id,
+                        'count' => 100,
+                    	'filter' => 'owner',
+                        'v' => '5.52',
+                        'access_token' => $accessToken
+                    );
+
+                $get_params = http_build_query($request_params);
+                $posts = json_decode(file_get_contents('https://api.vk.com/method/wall.get?'. $get_params));
+                $posts_array = $posts->response->items;
+
+                $loli = '';
+
                 //...пока не получим объект гиф - выбираем случайный пост из ста и проверяем: есть ли прикреплённые изображения/нет ли стоп-слов в тексте поста/не является ли пост рекламным
-                while (!isset($loli)) {
+                while (!$loli) {
                   $got_stop_words = FALSE;
                   $i = rand(2, 99);
                   $post = $posts_array[$i];
-                  foreach (STOP_WORDS as $word) {
-                    if (strpos(mb_strtolower($post['text']), $word) !== false) {
+                  foreach ($stop_words as $word) {
+                    if (strpos(mb_strtolower($post->text), $word) !== false) {
                       $got_stop_words = TRUE;
                       break;
                     }
                   }
-                  if (isset($post['attachments']) && !$got_stop_words && ($post['marked_as_ads'] == 0)) {
-                    $attachments = $post['attachments'];
+                  if (($post->attachments) && !$got_stop_words && ($post->marked_as_ads == 0)) {
+                    $attachments = $post->attachments;
                     foreach ($attachments as $attachment) {
-                      if ($attachment['type'] == 'doc') {
-                        $doc = $attachment['doc'];
-                        if ($doc['ext'] == 'gif'){
-                        	$loli = sprintf( 'doc%d_%d', $doc['owner_id'], $doc['id']);
+                      if ($attachment->type == 'doc') {
+                        $doc = $attachment->doc;
+                        if ($doc->ext == 'gif'){
+                        	$loli = sprintf( 'doc%d_%d', $doc->owner_id, $doc->id);
                         	break;
                         }
                       }
@@ -156,115 +195,149 @@ switch ($data->type) {
                   }
                 }
 
-                //С помощью messages.send и токена сообщества отправляем ответное сообщение с картинкой
-                $resp = $vk->request('messages.send', ['message' => 'Посмотри, что я нашла для тебя:',
-    									                'peer_id' => $peer_id,
-    									                'attachment' => $loli,
-								                        'access_token' => GROUP_TOKEN,
-								                        'v' => API_VERSION]);
+                //С помощью messages.send и токена сообщества отправляем ответное сообщение с гифкой
+                $request_params = array(
+                	'message' => 'Посмотри, что я нашла для тебя:',
+	                'user_id' => $userId,
+	                'attachment' => $loli,
+	                'access_token' => $token,
+	                'read_state' => 1,
+	                'v' => '5.0'
+                );
 
-                $vk->sendOK(); //Говорим vk, что мы приняли callback
+                $get_params = http_build_query($request_params);
+
+                file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+
+                //Возвращаем "ok" серверу Callback API
+                echo('ok');
+
                 break;
-         //.. проверяем, есть ли в тексте сообщения запрос на аниме
-        } elseif ((strpos($message, 'аниме') !== false) or (strpos($message, 'anime') !== false) or (strpos($message, 'анимэ') !== false)) {
-            	//...выбираем случайную группу из списка
-                $rand_elem = array_rand(ANIME_GROUPS);
-                $group_id = ANIME_GROUPS[$rand_elem];
-                $user = new vk_api(ACCESS_TOKEN, API_VERSION); // создание экземпляра класса работы с api, принимает ключ и версию api
-                $posts = $user->request('wall.get', ['owner_id' => $group_id,
-							                        'count' => 100,
-							                    	'filter' => 'owner',
-							                        'access_token' => ACCESS_TOKEN,
-							                    	'v' => API_VERSION]);
-                $posts_array = $posts['items'];
 
-                while (!isset($resp)) {
+            } catch (Exception $e) {}
+         //.. проверяем, есть ли в тексте сообщения запрос на аниме
+        } elseif ((strpos($body, 'аниме') !== false) or (strpos($body, 'anime') !== false) or (strpos($body, 'анимэ') !== false)) {
+        	try {
+            	//...если есть файл с токеном пользователя - читаем его из файла, если нет - получаем токен и пишем в файл
+                $accessToken = getToken($client_id, $client_secret, $login, $password);
+
+                //...выбираем случайную группу из списка
+                $rand_elem = array_rand($groups_anime);
+                $group_id = $groups_anime[$rand_elem];
+
+                //...получаем 100 первых записей со стены этой группы
+                $request_params = array(
+                        'owner_id' => $group_id,
+                        'count' => 100,
+                    	'filter' => 'owner',
+                        'v' => '5.52',
+                        'access_token' => $accessToken
+                    );
+
+                $get_params = http_build_query($request_params);
+                $posts = json_decode(file_get_contents('https://api.vk.com/method/wall.get?'. $get_params));
+                $posts_array = $posts->response->items;
+
+                $resp = '';
+                while (!$resp) {
+                    $loli = '';
                     //...пока не получим аниме - выбираем случайный пост из ста и проверяем:нет ли стоп-слов в тексте поста/не является ли пост рекламным
-                    while (!isset($loli)) {
+                    while (!$loli) {
                       $got_stop_words = FALSE;
                       $i = rand(2, 99);
                       $post = $posts_array[$i];
                       foreach ($stop_words as $word) {
-                        if (strpos(mb_strtolower($post['text']), $word) !== false) {
+                        if (strpos(mb_strtolower($post->text), $word) !== false) {
                           $got_stop_words = TRUE;
                           break;
                         }
                       }
-                      if (isset($post['attachments']) && !$got_stop_words && ($post['marked_as_ads'] == 0)) {
+                      if (($post->attachments) && !$got_stop_words && ($post->marked_as_ads == 0)) {
                         $text = '';
-                        $attachments = $post['attachments'];
+                        $attachments = $post->attachments;
                         foreach ($attachments as $attachment) {
-                          if ($attachment['type'] == 'doc') {
-                                $doc = $attachment['doc'];
-                                $loli .= sprintf( 'doc%d_%d,', $doc['owner_id'], $doc['id']);
+                          if ($attachment->type == 'doc') {
+                                $doc = $attachment->doc;
+                                $loli .= sprintf( 'doc%d_%d,', $doc->owner_id, $doc->id);
                             }
-                          if ($attachment['type'] == 'photo') {
-                                $photo = $attachment['photo'];
-                                $text .= $photo['text'];
-                                $loli .= sprintf( 'photo%d_%d,', $photo['owner_id'], $photo['id']);
+                          if ($attachment->type == 'photo') {
+                                $photo = $attachment->photo;
+                                $text .= $photo->text;
+                                $loli .= sprintf( 'photo%d_%d,', $photo->owner_id, $photo->id);
                             }
-                          if ($attachment['type'] == 'video') {
-                                $video = $attachment['video'];
-                                $loli .= sprintf( 'video%d_%d,', $video['owner_id'], $video['id']);
+                          if ($attachment->type == 'video') {
+                                $video = $attachment->video;
+                                $loli .= sprintf( 'video%d_%d,', $video->owner_id, $video->id);
                             }
                       }
                     }
                   }
 
-                //С помощью messages.send и токена сообщества отправляем ответное сообщение с аниме
-                try{$resp = $vk->request('messages.send', ['message' => $text,
-											                'peer_id' => $peer_id,
-											                'attachment' => $loli,
-									                        'access_token' => GROUP_TOKEN,
-									                        'v' => API_VERSION]);
-            		} catch (Exception $e) {}
+                  //С помощью messages.send и токена сообщества отправляем ответное сообщение с гифкой
+                $request_params = array(
+                    'message' => $text,
+                    'user_id' => $userId,
+                    'attachment' => $loli,
+                    'access_token' => $token,
+                    'read_state' => 1,
+                    'v' => '5.0'
+                );
+
+                $get_params = http_build_query($request_params);
+
+                try{$resp = file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);} catch (Exception $e) {}
                 }
 
-                $vk->sendOK(); //Говорим vk, что мы приняли callback
+                //Возвращаем "ok" серверу Callback API
+                echo('ok');
+
                 break;
 
+            } catch (Exception $e) {}
         } else {
-        	if ($payload != null && $payload['action']=='letter_to_admin') { // если payload существует
-			    $resp = $vk->request('messages.send', ['message' => sprintf( "С тобой хочет связаться @id%d", $peer_id),
-										                'peer_id' => ADMIN_ID,
-								                        'access_token' => GROUP_TOKEN,
-								                        'v' => API_VERSION]);
-			    $resp = $vk->request('messages.send', ['message' => "Админу отправлено оповещение, скоро он с тобой свяжется)",
-										                'peer_id' => $peer_id,
-								                        'access_token' => GROUP_TOKEN,
-								                        'v' => API_VERSION]);
-				$vk->sendOK(); //Говорим vk, что мы приняли callback
-				break;
+        	//...если в сообщении не было запроса на картинку - сразу отправляем ответ
+            $request_params = array(
+                'message' => "Я обязательно прочту твоё сообщение, как только смогу 😉<br>".
+                                "Не скучай, можешь пока полистать стену нашей группы)",
+                'user_id' => $userId,
+                'access_token' => $token,
+                'read_state' => 1,
+                'v' => '5.0'
+            );
 
-			} else {
-	        	//...если в сообщении не было запроса на картинку - сразу отправляем ответ
-	            $resp = $vk->request('messages.send', ['message' => "Я обязательно прочту твоё сообщение, как только смогу 😉<br>".
-	                                								"Не скучай, можешь пока полистать стену нашей группы)",
-										                'peer_id' => $peer_id,
-										                'attachment' => $loli,
-								                        'access_token' => GROUP_TOKEN,
-								                        'v' => API_VERSION]);
+            $get_params = http_build_query($request_params);
 
-	            $vk->sendOK(); //Говорим vk, что мы приняли callback
-	            break;
-        	}
+            file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+
+            //Возвращаем "ok" серверу Callback API
+            echo('ok');
+
+            break;
         }
 
     // Если это уведомление о выходе из группы
     case 'group_leave':
-        
-        $peer_id = $data->object->user_id; // получаем id вышедшего участника
+        //...получаем id вышедшего участника
+        $userId = $data->object->user_id;
 
         //С помощью messages.send и токена сообщества отправляем сообщение
-        $resp = $vk->request('messages.send', ['message' => "Жаль, что ты уже уходишь!<br>" .
-								                            "Если захочешь вернуться - здесь всегда тебе рады.<br>" .
-								                            "Удачи тебе ヽ(・∀・)ﾉ",
-											                'peer_id' => $peer_id,
-									                        'access_token' => GROUP_TOKEN,
-									                        'v' => API_VERSION]);
+        $request_params = array(
+            'message' => "Жаль, что ты уже уходишь!<br>" .
+                            "Если захочешь вернуться - здесь всегда тебе рады.<br>" .
+                            "Удачи тебе ヽ(・∀・)ﾉ",
+            'user_id' => $userId,
+            'access_token' => $token,
+            'read_state' => 1,
+            'v' => '5.0'
+        );
 
-        $vk->sendOK(); //Говорим vk, что мы приняли callback
+        $get_params = http_build_query($request_params);
+
+        file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+
+        //Возвращаем "ok" серверу Callback API
+        echo('ok');
+
         break;
 }
-
 ?>
