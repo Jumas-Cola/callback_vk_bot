@@ -91,4 +91,4 @@ $accessToken = 'ваш access token';
 После этого отправляем в сообщения группы письмо с ключевым словом и, если в ответ пришла картинка - значит всё работает правильно.  
   
 Demo:
-[https://vk.me/notice__me__senpai]
+ https://vk.me/notice__me__senpai
