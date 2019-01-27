@@ -212,6 +212,11 @@ function get_attachment($type)
                 continue;
             }
         }
+        if ($type == 'anime') {
+            if (!in_text(mb_strtolower($text), ['приятного просмотра'])) {
+                continue;
+            }
+        }
         break;
     }
     return ['attachment' => $res, 'text' => $text];
