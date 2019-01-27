@@ -204,15 +204,21 @@ function get_attachment($type)
         if (!$res) {
             continue;
         }
-        if ($type == 'gif') {
+        if ($type == 'photo') {
+            $photo_info = $user->request('photos.getById', [
+                      'photos' => str_replace('photo', '', $res)
+                    ]);
+            if (isset($photo_info['error'])) {
+                continue;
+            }
+        } elseif ($type == 'gif') {
             $gif_info = $user->request('docs.getById', [
                       'docs' => str_replace('doc', '', $res)
                     ]);
-            if (!$gif_info) {
+            if (!$gif_info or isset($gif_info['error'])) {
                 continue;
             }
-        }
-        if ($type == 'anime') {
+        } elseif ($type == 'anime') {
             if (!in_text(mb_strtolower($text), ['приятного просмотра'])) {
                 continue;
             }
